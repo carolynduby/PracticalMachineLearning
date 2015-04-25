@@ -1,0 +1,122 @@
+---
+title: "Prediciting Movement Quality With Wearables"
+output: html_document
+---
+```{r load_libraries_define_output_function, message=FALSE, warning=FALSE, echo=FALSE}
+library(caret)
+library(knitr)
+library(htmlTable)
+library(dplyr)
+
+## write project files for submission
+pml_write_files <- function(x, dir){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0(dir,"/problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+```
+
+## Overview
+
+This report outlines the results of applying several machine learning algorithms to predict the quality of dumbbell exercises performed from accelerometer and gyroscope measurements collected by wearable devices such as a Jawbone Up, Nike FuelBand or Fitbit.  The report uses the collected measurements to predict a class A - F that indicates the quality of the exercise.   More information about the collection method and meaning of classes can be found at [Human Activity Recognition]( http://groupware.les.inf.puc-rio.br/har) project. 
+
+## Model Building Method
+
+- Clean Training Data - Read in the assignment training data.  Clean up the training data removing times, identifiers, and columns that have missing or invalid values.
+
+```{r clean_data}
+  originalTraining <- read.csv("pml-training.csv")
+  validation <- read.csv("pml-testing.csv")
+  originalTraining <- originalTraining[grepl("classe|^roll_dumbbell|^pitch_dumbbell|^yaw_dumbbell|magnet_arm_[xyz]|magnet_belt_[xyz]|accel_arm_[xyz]|accel_belt_[xyz]|gyros_arm_[xyz]|gyros_belt_[xyz]|^roll_arm|^pitch_arm|^yaw_arm|^roll_belt|^pitch_belt|^yaw_belt", colnames(originalTraining))]
+```
+
+- Partition the data into training and test set - Partition the clean original training data into 80% training and 20% testing data to evaluate different algorithms.  
+
+```{r partition_data}
+  set.seed(78905)
+  trainIndex <- createDataPartition(y=originalTraining$classe, p=0.80, list=FALSE)
+  training <- originalTraining[trainIndex,]
+  testing <- originalTraining[-trainIndex,]
+```
+
+- Try different machine learning algorithms - Using 4-fold cross validation to minimize out of sample errors.
+
+```{r try_algorithm, message=FALSE, warning=FALSE}
+try_algorithm <- function(alg, training, testing, validation) {
+  
+  ## specify 4-fold cross validation
+  train_control <- trainControl(method="cv", number=4)
+  
+  ## fit model with specified algorithm and training partition of assignment training set
+  fit <- train(classe ~ ., method=alg, data=training, trControl=train_control)
+  
+  ## predict using the test partition of assignment training set
+  predictions <- predict(fit, testing)
+  
+  ## calculate the confusion matrix to get accuracy
+  confusionMat <- confusionMatrix(predictions, testing$classe)
+  
+  ## predict with the testing set for assignment and write submission files
+  pml_write_files(predict(fit, validation), alg)
+  
+  confusionMat
+}
+```
+
+- Select a model based on the accuracy of the results.  Measure accuracy by calculating correctness of predictions on the test partition.  See Cross Validation and Estimating Out of Sample Error section for results.
+- Apply selected algorithm to the assignment testing data.
+- Submit predicted results.
+
+```{r try_rpart, message=FALSE, warning=FALSE, echo=FALSE, cache=TRUE}
+  rpartMat <- try_algorithm("rpart", training, testing, validation)
+```
+```{r try_bagging, message=FALSE, warning=FALSE, echo=FALSE, cache=TRUE}
+  bagMat <- try_algorithm("treebag", training, testing, validation)
+```
+
+```{r try_boosting, message=FALSE, warning=FALSE, echo=FALSE, cache=TRUE, results='hide'}
+  gbmMat <- try_algorithm("gbm", training, testing, validation)
+```
+
+```{r try_naive_bayes, message=FALSE, warning=FALSE, echo=FALSE, cache=TRUE}
+  nbMat <- try_algorithm("nb", training, testing, validation)
+```
+
+```{r try_random_forest, message=FALSE, warning=FALSE, echo=FALSE, cache=TRUE}
+  rfMat <- try_algorithm("rf", training, testing, validation)
+```
+
+## Cross Validation and Estimating Out of Sample Error
+
+To find the best model, the train command was used to perform 4-fold cross validation.  The out of sample error was estimated by paritioning the original training data into a training and test subset.  The training subset was used to create the model and the test subset was used to estimate the out of sample error.  The out of sample error was calculated by creating a confusion matrix using the test data partition and then taking 1 - Accuracy.  The 95% confidence interval was calculated using 1 - AccuracyUpper and 1 - AccuracyLower.  
+
+The table below shows the Accuracy of each algorithm sorted by most accurate to least accurate:
+
+```{r compile_accuracy, results='asis', echo=F}
+  accuracyMat <- as.data.frame(rbind(round(rpartMat$overall, digits=2), 
+                                     round(bagMat$overall, digits=2), 
+                                     round(gbmMat$overall, digits=2), 
+                                     round(nbMat$overall, digits=2), 
+                                     round(rfMat$overall, digits=2)))
+  rownames(accuracyMat) <- c("rpart", "treebag", "gmb", "nb", "rf")
+
+  accuracyMat <- accuracyMat %>%  mutate(Algorithm=c("rpart", "treebag", "gmb", "nb", "rf"),
+                                        OutOfSampleError=1-Accuracy, LowerError=1-AccuracyUpper, 
+                                        UpperError=1-AccuracyLower) %>% 
+                                  select(Algorithm, Accuracy, OutOfSampleError, LowerError, UpperError)
+
+  htmlTable(x=as.matrix(accuracyMat[with(accuracyMat, order(LowerError, UpperError)), ]), rnames=FALSE, header=paste("&nbsp;",  colnames(accuracyMat), "&nbsp;", sep = ""), cgroup = c("", "95% Confidence Interval"), 
+n.cgroup = c(3, 2))
+```
+
+## Explanation of Choices
+
+In the end I chose random Forest because it produced the most accurate results.  The rpart produced the least accurate results.  Boosting and bagging did improve the tree model but it was still didn't perform as well as random forest.
+
+I chose 4-fold cross validation because it produced accurate results within a reasonable amount of time.  For research, I would use 10-fold repeated cross validation for better accuracy.
+
+## Performance on Assignment Test Data
+
+The random forest model selected was able to correctly predict the classes on all twenty of the assignment test data.
