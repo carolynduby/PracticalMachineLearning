@@ -94,7 +94,7 @@ img {
   ## fit model with specified algorithm and training partition of assignment training set
   fit &lt;- train(classe ~ ., method=alg, data=training, trControl=train_control)
   
-  ## prefict using the test partition of assignment training set
+  ## predict using the test partition of assignment training set
   predictions &lt;- predict(fit, testing)
   
   ## calculate the confusion matrix to get accuracy
@@ -113,7 +113,7 @@ img {
 </div>
 <div id="cross-validation-and-estimating-out-of-sample-error" class="section level2">
 <h2>Cross Validation and Estimating Out of Sample Error</h2>
-<p>To find the best model, the train command was used to perform 4-fold cross validation. The out of sample error was estimated by paritioning the original training data into a training and test subset. The training subset was used to create the model and the test subset was used to estimate the out of sample error. The out of sample error was calculated by creating a confusion matrix and then taking 1 - Accuracy. The 95% confidence interval was calculated using 1 - AccuracyUpper and 1 - AccuracyLower.</p>
+<p>To find the best model, the train command was used to perform 4-fold cross validation. The out of sample error was estimated by paritioning the original training data into a training and test subset. The training subset was used to create the model and the test subset was used to estimate the out of sample error. The out of sample error was calculated by creating a confusion matrix using the test data partition and then taking 1 - Accuracy. The 95% confidence interval was calculated using 1 - AccuracyUpper and 1 - AccuracyLower.</p>
 <p>The table below shows the Accuracy of each algorithm sorted by most accurate to least accurate:</p>
 <table class="gmisc_table" style="border-collapse: collapse;">
 <thead>
@@ -256,6 +256,10 @@ rpart
 <h2>Explanation of Choices</h2>
 <p>In the end I chose random Forest because it produced the most accurate results. The rpart produced the least accurate results. Boosting and bagging did improve the tree model but it was still didn’t perform as well as random forest.</p>
 <p>I chose 4-fold cross validation because it produced accurate results within a reasonable amount of time. For research, I would use 10-fold repeated cross validation for better accuracy.</p>
+</div>
+<div id="performance-on-assignment-test-data" class="section level2">
+<h2>Performance on Assignment Test Data</h2>
+<p>The random forest model selected was able to correctly predict the classes on all twenty of the assignment test data.</p>
 </div>
 
 
